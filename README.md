@@ -105,12 +105,15 @@ Install Hugging Face Hub if needed:
 pip install -U huggingface_hub
 ```
 
-Download the SVS model and preprocessing models:
+Download the SVS, SVC model and preprocessing models:
 ```sh
 pip install -U huggingface_hub
 
 # Download the SoulX-Singer SVS model
 hf download Soul-AILab/SoulX-Singer --local-dir pretrained_models/SoulX-Singer
+
+# Download the SoulX-Singer SVC model
+hf download Soul-AILab/SoulX-Singer-SVC --local-dir pretrained_models/SoulX-Singer-SVC
 
 # Download models required for preprocessing
 hf download Soul-AILab/SoulX-Singer-Preprocess --local-dir pretrained_models/SoulX-Singer-Preprocess
@@ -119,7 +122,7 @@ hf download Soul-AILab/SoulX-Singer-Preprocess --local-dir pretrained_models/Sou
 
 ### 4. Run the Demo
 
-Run the inference demo:
+#### Run the SVS inference demo
 ``` sh
 bash example/infer.sh
 ```
@@ -132,12 +135,28 @@ The metadata produced by the automatic preprocessing pipeline may not perfectly 
 How to use the Midi-Editor:
 - [Eiditing Metadata with Midi-Editor](preprocess/README.md#L104-L105)
 
+#### Run the SVC inference demo
+
+```sh
+bash example/infer_svc.sh
+```
+
+This example performs audio-to-audio SVC, converting the target singing into the prompt timbre using waveform and F0 inputs.
+To prepare your own SVC data, run `example/preprocess.sh` with `midi_transcribe=False`.
+
+
 
 ### 🌐 WebUI
 
-You can launch the interactive interface with:
+You can launch the interactive interface for SVS (Synthesised from lyrics and MIDI transcriptions) with:
 ```
 python webui.py
+```
+
+For SVC WebUI (audio-to-audio conversion):
+
+```
+python webui_svc.py
 ```
 
 
