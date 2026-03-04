@@ -3,6 +3,7 @@ import random
 import shutil
 import sys
 import traceback
+import gc
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Tuple
@@ -310,6 +311,9 @@ class AppState:
                 max_merge_duration=max_merge_duration,
                 language=lyric_lang or "Mandarin",
             )
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             return True, f"preprocess {audio_path} done"
         except Exception as e:
             return False, f"preprocess failed: {e}"
@@ -343,6 +347,9 @@ class AppState:
         args.control = control
         try:
             svs_process(args, self.svs_config, self.svs_model)
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             generated = save_dir / "generated.wav"
             if not generated.exists():
                 return False, f"inference finished but {generated} not found", None, prompt_meta_path, target_meta_path
