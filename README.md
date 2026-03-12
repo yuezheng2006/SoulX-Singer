@@ -23,7 +23,7 @@
 
 **SoulX-Singer** is a high-fidelity, zero-shot singing voice synthesis model that enables users to generate realistic singing voices for unseen singers. It supports **melody-conditioned (F0 contour)** and **score-conditioned (MIDI notes)** control for precise pitch, rhythm, and expression.
 
-**SoulX-Singer-SVC** is a singing voice conversion model finetuned from **SoulX-Singer**, enabling users to perform singing voice conversion without lyric and MIDI transcriptions.
+**SoulX-Singer-SVC** is a singing voice conversion (SVC) model finetuned from **SoulX-Singer**. Singing Voice Conversion aims to transform a source singing recording into the target singer’s voice while preserving the original melody, rhythm, and lyrical content. Based on the strong generative capability of SoulX-Singer, SoulX-Singer-SVC enables high-quality singing voice conversion directly from raw singing audio, without requiring lyric or MIDI transcriptions.
 
 ---
 
@@ -67,6 +67,7 @@
 ---
 
 ## 📰 News
+- **[2026-02-15]** SoulX-Singer-SVC is released.
 - **[2026-02-12]** [SoulX-Singer Eval Dataset](https://huggingface.co/datasets/Soul-AILab/SoulX-Singer-Eval-Dataset) is now available on Hugging Face Datasets.
 - **[2026-02-09]** [SoulX-Singer Online Demo](https://huggingface.co/spaces/Soul-AILab/SoulX-Singer) is live on Hugging Face Spaces — try singing voice synthesis in your browser.
 - **[2026-02-08]** [MIDI Editor](https://huggingface.co/spaces/Soul-AILab/SoulX-Singer-Midi-Editor) is available on Hugging Face Spaces.
