@@ -6,7 +6,7 @@ root_dir=$(dirname "$script_dir")
 cd $root_dir || exit
 export PYTHONPATH=$root_dir:$PYTHONPATH
 
-model_path=pretrained_models/SoulX-Singer-SVC/model.pt
+model_path=pretrained_models/SoulX-Singer/model-svc.pt
 config=soulxsinger/config/soulxsinger.yaml
 prompt_wav_path=example/audio/zh_prompt.mp3
 target_wav_path=example/audio/music.mp3

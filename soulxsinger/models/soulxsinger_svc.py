@@ -212,6 +212,20 @@ class SoulXSingerSVC(nn.Module):
         else:
             pitch_shift = pitch_shift
 
+        # if target audio is less than 30 seconds, infer the whole audio
+        if gt_wav.shape[-1] < 30 * self.audio_cfg.sample_rate:
+            generated_audio = self.infer_segment(
+                pt_wav=pt_wav,
+                gt_wav=gt_wav,
+                pt_f0=pt_f0,
+                gt_f0=gt_f0,
+                pitch_shift=pitch_shift,
+                n_steps=n_steps,
+                cfg=cfg,
+            )
+            return generated_audio, pitch_shift
+
+        # if target audio is longer than 30 seconds, build vocal segments and infer each segment
         generated_audio = []
 
         f0_rate = self.audio_cfg.sample_rate // self.audio_cfg.hop_size
@@ -264,7 +278,8 @@ class SoulXSingerSVC(nn.Module):
 
     def infer_segment(self, pt_wav, gt_wav, pt_f0, gt_f0, pitch_shift=0, n_steps=32, cfg=3):
         pt_mel = self.mel(pt_wav)
-        len_prompt_mel = pt_f0.shape[1]
+        len_prompt_mel = pt_mel.shape[1]
+        pt_f0 = F.pad(pt_f0, (0, 0, 0, max(0, len_prompt_mel - pt_f0.shape[1])))[:, :len_prompt_mel]
 
         f0_course_pt = self.f0_to_coarse(pt_f0)
         f0_course_gt = self.f0_to_coarse(gt_f0, f0_shift=pitch_shift * 5)
@@ -272,12 +287,13 @@ class SoulXSingerSVC(nn.Module):
 
         pt_content_feat = self.whisper_encoder.encode(pt_wav, sr=self.audio_cfg.sample_rate)
         gt_content_feat = self.whisper_encoder.encode(gt_wav, sr=self.audio_cfg.sample_rate)
+        t_pt, t_gt = f0_course_pt.shape[1], f0_course_gt.shape[1]
+        pt_content_feat = F.pad(pt_content_feat, (0, 0, 0, max(0, t_pt - pt_content_feat.shape[1])))[:, :t_pt, :]
+        gt_content_feat = F.pad(gt_content_feat, (0, 0, 0, max(0, t_gt - gt_content_feat.shape[1])))[:, :t_gt, :]
+
         content_feat = torch.cat([pt_content_feat, gt_content_feat], 1)
 
         f0_feat = self.f0_encoder(f0_course)
-        min_len = min(content_feat.shape[1], f0_feat.shape[1])
-        content_feat = content_feat[:, :min_len, :]
-        f0_feat = f0_feat[:, :min_len, :]
         features = content_feat + f0_feat
         
         gt_decoder_inp = features[:, len_prompt_mel:, :]

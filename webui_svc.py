@@ -60,7 +60,7 @@ _I18N = dict(
         zh="上传 Prompt 与 Target 音频，并配置相关参数",
     ),
     instruction_p2=dict(
-        en="Click the button to start singing voice conversion.",
+        en="Click「🎤Singing Voice Conversion」to start singing voice conversion.",
         zh="点击「🎤歌声转换」开始最终生成。",
     ),
 	tips_title=dict(en="Tips", zh="提示"),
@@ -145,7 +145,7 @@ class AppState:
 
 		self.svc_config = load_config("soulxsinger/config/soulxsinger.yaml")
 		self.svc_model = build_svc_model(
-			model_path="pretrained_models/SoulX-Singer-SVC/model.pt",
+			model_path="pretrained_models/SoulX-Singer/model-svc.pt",
 			config=self.svc_config,
 			device=self.device,
 		)
@@ -194,8 +194,6 @@ class AppState:
 
 			args = Args()
 			args.device = self.device
-			args.model_path = "soulx-singer-svc.pt"
-			args.config = "soulxsinger/config/soulxsinger.yaml"
 			args.prompt_wav_path = str(prompt_wav_path)
 			args.target_wav_path = str(target_wav_path)
 			args.prompt_f0_path = str(prompt_f0_path)
@@ -305,7 +303,30 @@ def _start_svc(prompt_audio, target_audio, prompt_vocal_sep, target_vocal_sep, a
 
 
 def render_interface() -> gr.Blocks:
-	with gr.Blocks(title="SoulX-Singer SVC Demo", theme=gr.themes.Default()) as page:
+	with gr.Blocks(title="SoulX-Singer-SVC Demo", theme=gr.themes.Default()) as page:
+		gr.HTML(
+            '<div style="'
+            'text-align: center; '
+            'padding: 1.25rem 0 1.5rem; '
+            'margin-bottom: 0.5rem;'
+            '">'
+            '<div style="'
+            'display: inline-block; '
+            'font-size: 1.75rem; '
+            'font-weight: 700; '
+            'letter-spacing: 0.02em; '
+            'color: #1a1a2e; '
+            'line-height: 1.3;'
+            '">SoulX-Singer-SVC</div>'
+            '<div style="'
+            'width: 80px; '
+            'height: 3px; '
+            'margin: 1rem auto 0; '
+            'background: linear-gradient(90deg, transparent, #6366f1, transparent); '
+            'border-radius: 2px;'
+            '"></div>'
+            '</div>'
+        )
 		with gr.Row(equal_height=True):
 			lang_choice = gr.Radio(
 				choices=["中文", "English"],
@@ -315,7 +336,6 @@ def render_interface() -> gr.Blocks:
 				interactive=True,
 			)
 
-		title_md = gr.Markdown(_i18n("title"))
 		usage_md = gr.Markdown(_usage_md())
 
 		with gr.Row(equal_height=True):
@@ -402,7 +422,6 @@ def render_interface() -> gr.Blocks:
 			inputs=[lang_choice],
 			outputs=[
 				lang_choice,
-				title_md,
 				usage_md,
 				prompt_audio,
 				target_audio,
