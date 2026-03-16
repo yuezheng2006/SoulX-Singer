@@ -17,6 +17,7 @@ def build_model(
     model_path: str,
     config: DictConfig,
     device: str = "cuda",
+    use_fp16: bool = False,
 ):
     """
     Build the model from the pre-trained model path and model configuration.
@@ -25,9 +26,10 @@ def build_model(
         model_path (str): Path to the checkpoint file.
         config (DictConfig): Model configuration.
         device (str, optional): Device to use. Defaults to "cuda".
+        use_fp16 (bool, optional): If True and device is CUDA, convert model to FP16 after load. Defaults to False.
 
     Returns:
-        Tuple[torch.nn.Module, torch.nn.Module]: The initialized model and vocoder.
+        SoulXSingerSVC: The initialized model.
     """
 
     if not os.path.isfile(model_path):
@@ -39,7 +41,7 @@ def build_model(
     print("Model initialized.")
     print("Model parameters:", sum(p.numel() for p in model.parameters()) / 1e6, "M")
     
-    checkpoint = torch.load(model_path, weights_only=False, map_location=device)
+    checkpoint = torch.load(model_path, weights_only=False, map_location="cpu")
     if "state_dict" not in checkpoint:
         raise KeyError(
             f"Checkpoint at {model_path} has no 'state_dict' key. "
@@ -47,9 +49,13 @@ def build_model(
         )
     model.load_state_dict(checkpoint["state_dict"], strict=True)
     
+    if use_fp16 and ((isinstance(device, str) and device.startswith("cuda")) or (hasattr(device, "type") and getattr(device, "type", None) == "cuda")):
+        model.half()
+        model.mel.float()
+        print("Model converted to FP16 (mel kept in FP32).")
+    print("Model checkpoint loaded.")
     model.eval()
     model.to(device)
-    print("Model checkpoint loaded.")
 
     return model
 
@@ -67,8 +73,19 @@ def process(args, config, model: torch.nn.Module):
     n_step = args.n_steps if hasattr(args, "n_steps") else config.infer.n_steps
     cfg = args.cfg if hasattr(args, "cfg") else config.infer.cfg
 
-    generated_audio, generated_shift = model.infer(pt_wav, gt_wav, pt_f0, gt_f0, auto_shift=args.auto_shift, pitch_shift=args.pitch_shift, n_steps=n_step, cfg=cfg)
-    generated_audio = generated_audio.squeeze().cpu().numpy()
+    with torch.no_grad():
+        generated_audio, generated_shift = model.infer(
+            pt_wav=pt_wav,
+            gt_wav=gt_wav,
+            pt_f0=pt_f0,
+            gt_f0=gt_f0,
+            auto_shift=args.auto_shift, 
+            pitch_shift=args.pitch_shift, 
+            n_steps=n_step, 
+            cfg=cfg,
+            use_fp16=args.use_fp16,
+        )
+    generated_audio = generated_audio.squeeze().float().cpu().numpy()
     if args.pitch_shift != generated_shift:
         args.pitch_shift = generated_shift
         # print(f"Applied pitch shift of {generated_shift} semitones to match GT F0 contour.")
@@ -82,6 +99,7 @@ def main(args, config):
         model_path=args.model_path,
         config=config,
         device=args.device,
+        use_fp16=getattr(args, "use_fp16", False),
     )
     process(args, config, model)
 
@@ -99,7 +117,14 @@ if __name__ == "__main__":
     parser.add_argument("--pitch_shift", type=int, default=0)
     parser.add_argument("--n_steps", type=int, default=32)
     parser.add_argument("--cfg", type=float, default=3.0)
+    parser.add_argument(
+        "--fp16",
+        action="store_true",
+        default=False,
+        help="Use FP16 inference (faster on GPU)",
+    )
     args = parser.parse_args()
-    
+    args.use_fp16 = args.fp16
+
     config = load_config(args.config)
     main(args, config)

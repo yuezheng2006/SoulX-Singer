@@ -4,12 +4,17 @@ import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
 from typing import Optional, Dict, Any, List, Tuple
+from contextlib import nullcontext
 
 from soulxsinger.models.modules.vocoder import Vocoder
 from soulxsinger.models.modules.decoder import CFMDecoder
 from soulxsinger.models.modules.mel_transform import MelSpectrogramEncoder
 from soulxsinger.models.modules.whisper_encoder import WhisperEncoder
 
+
+def _autocast_if(enabled: bool):
+    """Return autocast(context) if enabled else no-op context. Use: with _autocast_if(use_amp): ..."""
+    return torch.amp.autocast(device_type="cuda", enabled=True) if enabled else nullcontext()
 
 class SoulXSingerSVC(nn.Module):
     """
@@ -186,6 +191,7 @@ class SoulXSingerSVC(nn.Module):
         pitch_shift=0,
         n_steps=32,
         cfg=3,
+        use_fp16=False,
     ):
         """
         SVC inference pipeline. First build vocal segments based on F0 contour, then run inference for each segment and merge results.
@@ -198,6 +204,7 @@ class SoulXSingerSVC(nn.Module):
             pitch_shift: manual pitch shift in semitones (overrides auto_shift if > 0)
             n_steps: number of diffusion steps for inference
             cfg: classifier-free guidance scale for inference
+            use_fp16: if True, run in FP16 except mel extraction to save memory and speed.
         """
 
         # calculate auto pitch shift
@@ -212,17 +219,29 @@ class SoulXSingerSVC(nn.Module):
         else:
             pitch_shift = pitch_shift
 
+        use_fp16 = use_fp16 and pt_wav.is_cuda
+        # mel is kept in fp32 (see build_model: model.mel.float() after model.half())
+        pt_mel = self.mel(pt_wav.float() if pt_wav.dtype != torch.float32 else pt_wav)
+        if use_fp16:
+            pt_mel = pt_mel.half()
+            pt_wav = pt_wav.half()
+            gt_wav = gt_wav.half()
+            pt_f0 = pt_f0.half()
+            gt_f0 = gt_f0.half()
+
         # if target audio is less than 30 seconds, infer the whole audio
         if gt_wav.shape[-1] < 30 * self.audio_cfg.sample_rate:
-            generated_audio = self.infer_segment(
-                pt_wav=pt_wav,
-                gt_wav=gt_wav,
-                pt_f0=pt_f0,
-                gt_f0=gt_f0,
-                pitch_shift=pitch_shift,
-                n_steps=n_steps,
-                cfg=cfg,
-            )
+            with _autocast_if(use_fp16):
+                generated_audio = self.infer_segment(
+                    pt_mel=pt_mel,
+                    pt_wav=pt_wav,
+                    gt_wav=gt_wav,
+                    pt_f0=pt_f0,
+                    gt_f0=gt_f0,
+                    pitch_shift=pitch_shift,
+                    n_steps=n_steps,
+                    cfg=cfg,
+                )
             return generated_audio, pitch_shift
 
         # if target audio is longer than 30 seconds, build vocal segments and infer each segment
@@ -258,15 +277,17 @@ class SoulXSingerSVC(nn.Module):
 
             segment_gt_wav = gt_wav[:, wav_start:wav_end]
             segment_gt_f0 = gt_f0[:, f0_start:f0_end]
-            segment_generated_audio = self.infer_segment(
-                pt_wav=pt_wav,
-                gt_wav=segment_gt_wav,
-                pt_f0=pt_f0,
-                gt_f0=segment_gt_f0,
-                pitch_shift=pitch_shift,
-                n_steps=n_steps,
-                cfg=cfg,
-            )
+            with _autocast_if(use_fp16):
+                segment_generated_audio = self.infer_segment(
+                    pt_mel=pt_mel,
+                    pt_wav=pt_wav,
+                    gt_wav=segment_gt_wav,
+                    pt_f0=pt_f0,
+                    gt_f0=segment_gt_f0,
+                    pitch_shift=pitch_shift,
+                    n_steps=n_steps,
+                    cfg=cfg,
+                )
 
             segment_start = int(round(seg_start_sec * self.audio_cfg.sample_rate))
             segment_end = int(round(seg_end_sec * self.audio_cfg.sample_rate))
@@ -276,8 +297,7 @@ class SoulXSingerSVC(nn.Module):
     
         return generated_audio, pitch_shift
 
-    def infer_segment(self, pt_wav, gt_wav, pt_f0, gt_f0, pitch_shift=0, n_steps=32, cfg=3):
-        pt_mel = self.mel(pt_wav)
+    def infer_segment(self, pt_mel, pt_wav, gt_wav, pt_f0, gt_f0, pitch_shift=0, n_steps=32, cfg=3):
         len_prompt_mel = pt_mel.shape[1]
         pt_f0 = F.pad(pt_f0, (0, 0, 0, max(0, len_prompt_mel - pt_f0.shape[1])))[:, :len_prompt_mel]
 
@@ -308,7 +328,7 @@ class SoulXSingerSVC(nn.Module):
         )
         
         generated_audio = self.vocoder(generated_mel.transpose(1, 2)[0:1, ...])
-        generated_audio = generated_audio.squeeze()
+        generated_audio = generated_audio.squeeze().float()
 
         # cut or pad to match gt_wav length
         if generated_audio.shape[-1] > gt_wav.shape[-1]:

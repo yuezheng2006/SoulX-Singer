@@ -24,4 +24,5 @@ python -m cli.inference_svc \
     --target_f0_path $target_f0_path \
     --save_dir $save_dir \
     --auto_shift \
-    --pitch_shift 0
+    --pitch_shift 0 \
+    --fp16

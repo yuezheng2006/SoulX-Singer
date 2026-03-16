@@ -132,8 +132,9 @@ def _tips_md() -> str:
 
 
 class AppState:
-	def __init__(self) -> None:
+	def __init__(self, use_fp16: bool = False) -> None:
 		self.device = _get_device()
+		self.use_fp16 = use_fp16 and ("cuda" in self.device)
 		self.preprocess_pipeline = PreprocessPipeline(
 			device=self.device,
 			language="Mandarin",
@@ -148,6 +149,7 @@ class AppState:
 			model_path="pretrained_models/SoulX-Singer/model-svc.pt",
 			config=self.svc_config,
 			device=self.device,
+			use_fp16=self.use_fp16,
 		)
 
 	def run_preprocess(self, audio_path: Path, save_path: Path, vocal_sep: bool) -> tuple[bool, str, Path | None, Path | None]:
@@ -203,6 +205,7 @@ class AppState:
 			args.pitch_shift = int(pitch_shift)
 			args.n_steps = int(n_step)
 			args.cfg = float(cfg)
+			args.use_fp16 = self.use_fp16
 
 			svc_process(args, self.svc_config, self.svc_model)
 
@@ -244,7 +247,7 @@ class AppState:
 			return False, f"svc inference failed: {e}", None
 
 
-APP_STATE = AppState()
+APP_STATE = AppState(use_fp16="--fp16" in sys.argv)
 
 
 def _start_svc(prompt_audio, target_audio, prompt_vocal_sep, target_vocal_sep, auto_shift, auto_mix_acc, pitch_shift, n_step, cfg, seed):
@@ -448,6 +451,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--port", type=int, default=7861, help="Gradio server port")
 	parser.add_argument("--share", action="store_true", help="Create public link")
+	parser.add_argument("--fp16", action="store_true", help="Use FP16 for SVC model and inference")
 	args = parser.parse_args()
 
 	page = render_interface()
