@@ -52,7 +52,7 @@
 
 ## 🎬 Demo Examples
 
-
+### Singing Voice Synthesis (SVS)
 <div align="center">
 
 <https://github.com/user-attachments/assets/13306f10-3a29-46ba-bcef-d6308d05cbcc>
@@ -63,6 +63,8 @@
 <https://github.com/user-attachments/assets/2eb260fe-6f0b-408c-aab8-5b81ddddb284>
 
 </div>
+
+### Singing Voice Conversion (SVC)
 <div align="center">
 
 <https://github.com/user-attachments/assets/aed15fc9-14c3-44fc-9146-f6d9fef894d3>
