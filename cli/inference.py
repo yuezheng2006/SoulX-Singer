@@ -114,7 +114,8 @@ def process(args, config, model: torch.nn.Module):
             )
 
         generated_audio = generated_audio.squeeze().cpu().numpy()
-        generated_merged[start_sample_idx : start_sample_idx + generated_audio.shape[0]] = generated_audio
+        gen_len = min(generated_audio.shape[0], generated_merged.shape[0] - start_sample_idx)
+        generated_merged[start_sample_idx: start_sample_idx + gen_len] = generated_audio[:gen_len]
 
     merged_path = os.path.join(args.save_dir, "generated.wav")
     sf.write(merged_path, generated_merged, 24000)
