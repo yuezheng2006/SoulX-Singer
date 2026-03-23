@@ -1,0 +1,3 @@
+[submodule "space"]
+	path = space
+	url = https://huggingface.co/spaces/vincenthugging/SoulX-Singer-with-background
