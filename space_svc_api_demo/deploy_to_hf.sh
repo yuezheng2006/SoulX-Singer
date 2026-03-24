@@ -59,6 +59,15 @@ else
   git remote add origin "${SPACE_REPO}"
 fi
 
+# Hub 新建 Space 时常带有自动生成的 README，直接 push 会 non-fast-forward
+git fetch origin 2>/dev/null || true
+if git show-ref --verify --quiet "refs/remotes/origin/main"; then
+  if ! git merge-base --is-ancestor "origin/main" HEAD 2>/dev/null; then
+    echo "合并 Hugging Face 上的初始提交（若 README 冲突，解决后 git commit 再执行本脚本 push）..."
+    git pull --no-rebase origin main --allow-unrelated-histories --no-edit || true
+  fi
+fi
+
 echo "推送到 Hugging Face..."
 git branch -M main 2>/dev/null || true
 git push -u origin main
