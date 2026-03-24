@@ -1,2 +1,4 @@
 gradio>=4.44.0,<6
 httpx>=0.27.0
+# Python 3.13+ 移除 stdlib audioop，Gradio/pydub 需此包（HF 默认若仍为 3.13 亦可启动）
+audioop-lts>=0.2.1; python_version >= "3.13"

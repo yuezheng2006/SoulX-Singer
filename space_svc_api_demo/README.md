@@ -5,6 +5,8 @@ colorFrom: indigo
 colorTo: gray
 sdk: gradio
 sdk_version: 4.44.0
+# 避免 3.13 下 audioop 缺失导致 Gradio/pydub 导入失败（与 requirements 中 audioop-lts 二选一即可，双保险）
+python_version: 3.12.8
 app_file: app.py
 pinned: false
 license: apache-2.0
