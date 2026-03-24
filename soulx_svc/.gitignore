@@ -1,0 +1,3 @@
+# 本地测试音频不入库；可将文件放在 audios/ 下自用
+audios/*
+!audios/.gitkeep

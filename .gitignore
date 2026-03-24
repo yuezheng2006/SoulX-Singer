@@ -36,6 +36,11 @@ data/
 outputs/
 deploy/
 .gradio/
+.venv_svc_test/
+soulx_svc/test_config.toml
+
+# space_svc_api_demo 单独 git init 推送独立 HF Space 时，嵌套仓库不要进主仓库
+space_svc_api_demo/.git/
 
 # midi editor
 node_modules/

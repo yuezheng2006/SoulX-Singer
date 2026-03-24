@@ -1,0 +1,4 @@
+# 仅运行 soulx_svc HTTP API 时额外安装
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
