@@ -200,10 +200,7 @@ def call_svc_api(
 def main():
     with gr.Blocks(
         title="SoulX SVC API 演示",
-        theme=gr.themes.Soft(
-            primary_hue="indigo",
-            secondary_hue="slate",
-        ),
+        theme=gr.themes.Soft(primary_hue="indigo", secondary_hue="slate"),
     ) as demo:
         gr.Markdown(
             "## SoulX-Singer SVC · API 调用演示\n"
@@ -249,7 +246,10 @@ def main():
 
         btn = gr.Button("调用 API", variant="primary")
         status = gr.Textbox(label="状态", lines=4)
-        curl_out = gr.Code(label="等效 curl（路径需替换为本机文件）", language="bash")
+        curl_out = gr.Code(
+            label="等效 curl（路径需替换为本机文件）",
+            language="shell",
+        )
         audio_out = gr.Audio(label="生成结果", type="filepath")
 
         inputs = [
