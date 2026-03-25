@@ -60,6 +60,20 @@ def get_runner():
 
 app = FastAPI(title="SoulX-Singer SVC API", version="0.1.0")
 
+_cors = os.environ.get("SVC_CORS_ORIGINS", "").strip()
+if _cors:
+    from fastapi.middleware.cors import CORSMiddleware
+
+    _orig = [x.strip() for x in _cors.split(",") if x.strip()]
+    _wildcard = len(_orig) == 1 and _orig[0] == "*"
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_orig,
+        allow_credentials=not _wildcard,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 
 def _cleanup_session(path: Path) -> None:
     shutil.rmtree(path, ignore_errors=True)

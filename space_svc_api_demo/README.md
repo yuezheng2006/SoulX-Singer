@@ -9,7 +9,7 @@ python_version: 3.12.8
 app_file: app.py
 pinned: false
 license: apache-2.0
-short_description: 演示 HTTP 调用 SoulX-Singer SVC FastAPI（POST /v1/svc）
+short_description: 展示对外 API URL；嵌入模式提供 POST /api/v1/svc 并支持 CORS
 ---
 
 # SoulX SVC API Playground
@@ -84,27 +84,31 @@ git push -u origin main
 
 **方式 A — 网页**：打开 [New Space](https://huggingface.co/new-space)，SDK 选 **Gradio**，将本目录文件推到该空仓库（与 CLI 二选一即可）。
 
-（可选）在 Space **Settings → Repository secrets** 添加 `SVC_API_BASE_URL`，默认填好你的 API 地址。
+（可选）在 Space **Variables / Secrets** 中配置下方变量；**对外展示准确 API 地址** 建议设置 `SVC_PUBLIC_API_BASE`。
 
 ## 环境变量（可选）
 
 | 变量 | 说明 |
 |------|------|
-| `SVC_API_BASE_URL` | 默认 API Base URL |
-| `SVC_API_TIMEOUT_SEC` | 请求超时秒数，默认 `3600`（长音频建议保持较大） |
+| `SVC_PUBLIC_API_BASE` | **推荐**。对外 API 根路径，无尾斜杠，例如 `https://你的用户-space名.hf.space/api`。页首表格与 curl 示例均用此值；未设时尝试用 HF 注入的 `SPACE_ID` / `SPACE_*` 拼接。 |
+| `SVC_CORS_ORIGINS` | **对外跨域**：合并服务（`app.py` 嵌入模式）默认 `*`。单独跑 `python -m soulx_svc.api` 时仅当设置此变量才启用 CORS。多域名用逗号分隔；`*` 时不带 credentials。 |
+| `SVC_API_BASE_URL` | 轻量模式（未内置 soulx_svc）下 Gradio 默认要调用的 Base URL。 |
+| `SVC_API_TIMEOUT_SEC` | 请求超时秒数，默认 `3600`。 |
+| `SVC_API_EMBEDDED` | 设为 `0` 可强制关闭嵌入模式检测（一般无需设置）。 |
 
 ## 与主仓库关系
 
 本目录可单独复制为 HF 仓库；亦位于 [SoulX-Singer](https://github.com/Soul-AILab/SoulX-Singer) 仓库的 `space_svc_api_demo/`，与完整推理 Space（`space/` 子模块）相互独立。
 
-## curl 示例
+## curl 示例（Space 合并部署时路径带 `/api`）
 
 ```bash
-BASE="http://127.0.0.1:8088"
+BASE="https://你的用户-space名.hf.space/api"
 curl -sS -X POST "$BASE/v1/svc?n_steps=32&cfg=1.0" \
   -F "prompt_audio=@prompt.wav" \
   -F "target_audio=@target.wav" \
   -o generated.wav
 ```
 
-API 契约以主项目 `soulx_svc/api.py` 为准。
+单独运行 `python -m soulx_svc.api`（无 `/api` 前缀）时：`BASE="http://127.0.0.1:8088"`。  
+契约以主项目 `soulx_svc/api.py` 为准。
