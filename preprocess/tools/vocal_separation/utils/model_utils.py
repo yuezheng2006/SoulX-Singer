@@ -81,8 +81,11 @@ def demix(
     batch_size = config.inference.batch_size
 
     use_amp = getattr(config.training, 'use_amp', True)
+    is_cuda = device.type == "cuda" if hasattr(device, "type") else str(device).startswith("cuda")
+    if not is_cuda:
+        use_amp = False  # autocast on CPU has limited benefit, skip to avoid issues
 
-    with torch.cuda.amp.autocast(enabled=use_amp):
+    with torch.amp.autocast(device_type="cuda" if is_cuda else "cpu", enabled=use_amp):
         with torch.inference_mode():
             # Initialize result and counter tensors
             req_shape = (num_instruments,) + mix.shape

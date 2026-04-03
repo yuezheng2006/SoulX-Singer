@@ -58,7 +58,8 @@ def build_models(dict_args, use_der: bool = False):
     args = parse_args_inference(dict_args)
 
     ########## load model ##########
-    torch.backends.cudnn.benchmark = True
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
 
     args.config_path = args.sep_config_path
     args.start_check_point = args.sep_start_check_point
@@ -152,12 +153,15 @@ class VocalSeparator:
 
         sep_model, sep_config, dereverb_model, dereverb_config, args = build_models(args_dict, use_der=use_der)
 
-        sep_model = sep_model.half()
+        use_fp16 = "cuda" in str(device).lower()
+        if use_fp16:
+            sep_model = sep_model.half()
         sep_model = sep_model.to(device)
         sep_config.inference.chunk_size = int(chunk_length_sec * sep_config.audio.sample_rate)
         if dereverb_model is not None:
             dereverb_config.inference.chunk_size = int(chunk_length_sec * dereverb_config.audio.sample_rate)
-            dereverb_model = dereverb_model.half()
+            if use_fp16:
+                dereverb_model = dereverb_model.half()
             dereverb_model = dereverb_model.to(device)
 
         self.sep_model = sep_model

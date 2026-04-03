@@ -173,8 +173,9 @@ def extract_one_process(wav_fns: list, id_and_sizes=None, ckpt=None, sr=24000, h
             f0_res[idx] = f0s[i]
 
     if rmvpe is not None:
-        rmvpe.release_cuda()
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            rmvpe.release_cuda()
+            torch.cuda.empty_cache()
         rmvpe = None
 
     return f0_res

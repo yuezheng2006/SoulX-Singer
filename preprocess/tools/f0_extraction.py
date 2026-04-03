@@ -411,6 +411,8 @@ class F0Extractor:
 
         self.verbose = verbose
 
+        # CPU mode: force fp32 (is_half=False) for compatibility
+        is_half = is_half and ("cuda" in str(device).lower())
         self.model = RMVPE(model_path, is_half=is_half, device=device)
 
         if self.verbose:
@@ -418,7 +420,7 @@ class F0Extractor:
                 "[f0 extraction] init success:",
                 f"device={device}",
                 f"model_path={model_path}",
-                f"is_half={is_half}",
+                f"is_half={self.model.is_half}",
                 f"input_sr={input_sr}",
                 f"target_sr={target_sr}",
                 f"hop_size={hop_size}",

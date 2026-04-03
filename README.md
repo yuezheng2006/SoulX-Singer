@@ -82,6 +82,13 @@
 
 ---
 
+## 📚 Documentation
+
+- **[基础概念与名词解释](docs/)** – SVS、SVC、RVC 等概念说明及术语速查
+- **[Space 维护](docs/SPACE_MAINTENANCE.md)** – HF Space 代码位于 `space/` 目录，本地编辑后推送到线上
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Clone Repository

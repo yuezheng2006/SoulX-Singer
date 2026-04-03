@@ -6,7 +6,7 @@ root_dir=$(dirname "$script_dir")
 cd $root_dir || exit
 export PYTHONPATH=$root_dir:$PYTHONPATH
 
-device=cuda
+device=${DEVICE:-cuda}  # Use DEVICE=cpu for CPU mode
 
 
 ####### Run Prompt Annotation #######

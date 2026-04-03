@@ -13,8 +13,10 @@ from soulxsinger.models.modules.mel_transform import MelSpectrogramEncoder
 
 
 def _autocast_if(enabled: bool):
-    """Return autocast(context) if enabled else no-op context. Use: with _autocast_if(use_amp): ..."""
-    return torch.amp.autocast(device_type="cuda", enabled=True) if enabled else nullcontext()
+    """Return autocast(context) if enabled and CUDA available, else no-op. CPU mode uses nullcontext."""
+    if not enabled or not torch.cuda.is_available():
+        return nullcontext()
+    return torch.amp.autocast(device_type="cuda", enabled=True)
 
 class SoulXSinger(nn.Module):
     """

@@ -13,9 +13,10 @@ target_wav_path=example/audio/music.mp3
 prompt_f0_path=example/audio/zh_prompt_f0.npy
 target_f0_path=example/audio/music_f0.npy
 save_dir=example/generated/music_svc
+device=${DEVICE:-cuda}  # Use DEVICE=cpu for CPU mode
 
 python -m cli.inference_svc \
-    --device cuda \
+    --device $device \
     --model_path $model_path \
     --config $config \
     --prompt_wav_path $prompt_wav_path \
@@ -25,4 +26,4 @@ python -m cli.inference_svc \
     --save_dir $save_dir \
     --auto_shift \
     --pitch_shift 0 \
-    --fp16
+    $([[ "$device" == cuda* ]] && echo "--fp16" || true)

@@ -105,7 +105,12 @@ def main(args, config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda" if torch.cuda.is_available() else "cpu",
+        help="Device for inference: 'cuda' or 'cpu'. Auto-detects when CUDA is available.",
+    )
     parser.add_argument("--model_path", type=str, default='pretrained_models/soulx-singer/model.pt')
     parser.add_argument("--config", type=str, default='soulxsinger/config/soulxsinger.yaml')
     parser.add_argument("--prompt_wav_path", type=str, default='example/audio/zh_prompt.wav')

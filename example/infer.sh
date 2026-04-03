@@ -14,9 +14,10 @@ target_metadata_path=example/audio/music.json
 phoneset_path=soulxsinger/utils/phoneme/phone_set.json
 save_dir=example/generated/music
 control=score  # melody or score
+device=${DEVICE:-cuda}  # Use DEVICE=cpu for CPU mode
 
 python -m cli.inference \
-    --device cuda \
+    --device $device \
     --model_path $model_path \
     --config $config \
     --prompt_wav_path $prompt_wav_path \
@@ -26,4 +27,4 @@ python -m cli.inference \
     --save_dir $save_dir \
     --auto_shift \
     --pitch_shift 0 \
-    --fp16
+    $([[ "$device" == cuda* ]] && echo "--fp16" || true)
