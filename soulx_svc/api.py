@@ -32,9 +32,10 @@ from soulx_svc.cpu_threads import apply_cpu_thread_limits_from_env
 
 apply_cpu_thread_limits_from_env()
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+import httpx
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
 if TYPE_CHECKING:
@@ -79,19 +80,48 @@ def _cleanup_session(path: Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
+async def _download_or_read_upload(
+    url_or_upload: Optional[str],
+    upload: Optional[UploadFile],
+    dest_path: Path,
+    param_name: str,
+) -> None:
+    """下载 URL 或读取上传文件到 dest_path"""
+    if url_or_upload:
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
+                resp = await client.get(url_or_upload)
+                resp.raise_for_status()
+                dest_path.write_bytes(resp.content)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to download {param_name}: {str(e)}",
+            ) from e
+    elif upload:
+        data = await upload.read()
+        if not data:
+            raise HTTPException(status_code=400, detail=f"empty file: {upload.filename}")
+        dest_path.write_bytes(data)
+    else:
+        raise HTTPException(status_code=400, detail=f"Either {param_name} or {param_name}_url is required")
+
+
 @app.post("/v1/svc")
 async def convert_svc(
     background_tasks: BackgroundTasks,
-    prompt_audio: UploadFile = File(..., description="Reference timbre (singing)"),
-    target_audio: UploadFile = File(..., description="Singing to convert"),
-    prompt_vocal_sep: bool = False,
-    target_vocal_sep: bool = True,
-    auto_shift: bool = True,
-    auto_mix_acc: bool = True,
-    pitch_shift: int = 0,
-    n_steps: int = 32,
-    cfg: float = 1.0,
-    seed: int = 42,
+    prompt_audio: Optional[UploadFile] = File(None, description="Reference timbre (singing, file upload)"),
+    prompt_audio_url: Optional[str] = Form(None, description="Reference timbre (URL)"),
+    target_audio: Optional[UploadFile] = File(None, description="Singing to convert (file upload)"),
+    target_audio_url: Optional[str] = Form(None, description="Singing to convert (URL)"),
+    prompt_vocal_sep: bool = Form(False),
+    target_vocal_sep: bool = Form(True),
+    auto_shift: bool = Form(True),
+    auto_mix_acc: bool = Form(True),
+    pitch_shift: int = Form(0),
+    n_steps: int = Form(32),
+    cfg: float = Form(1.0),
+    seed: int = Form(42),
 ):
     try:
         from soulx_svc.runner import SVCRunParams, new_session_dir
@@ -101,23 +131,15 @@ async def convert_svc(
             detail=f"SVC 推理依赖未安装（请在项目 conda/venv 中安装 requirements.txt 等）: {e}",
         ) from e
 
-    if not prompt_audio.filename or not target_audio.filename:
-        raise HTTPException(status_code=400, detail="prompt_audio and target_audio are required")
-
     session = new_session_dir()
     try:
         up_dir = session / "uploads"
         up_dir.mkdir(parents=True, exist_ok=True)
-        ext_p = Path(prompt_audio.filename or "prompt").suffix or ".wav"
-        ext_t = Path(target_audio.filename or "target").suffix or ".wav"
-        p_path = up_dir / f"prompt{ext_p}"
-        t_path = up_dir / f"target{ext_t}"
+        p_path = up_dir / "prompt.wav"
+        t_path = up_dir / "target.wav"
 
-        for upload, dest in ((prompt_audio, p_path), (target_audio, t_path)):
-            data = await upload.read()
-            if not data:
-                raise HTTPException(status_code=400, detail=f"empty file: {upload.filename}")
-            dest.write_bytes(data)
+        await _download_or_read_upload(prompt_audio_url, prompt_audio, p_path, "prompt_audio")
+        await _download_or_read_upload(target_audio_url, target_audio, t_path, "target_audio")
 
         params = SVCRunParams(
             prompt_vocal_sep=prompt_vocal_sep,
