@@ -1,86 +1,305 @@
-SoulX-Singer大模型本地部署保姆级教程
-一、环境准备
-在开始之前，请确保你的电脑（推荐 Win10/Win11）已经安装了以下“三大件”：
-1、Visual Studio 2022
-很多 AI 依赖包在安装时需要编译 C++ 代码。请去微软官网下载 VS 2022 社区版，安装时务必勾选【使用 C++ 的桌面开发】。如果没有它，后面安装依赖时可能会报错。
-2、git
-用于从 GitHub 上拉取最新的源代码。
+# SoulX-Singer SVC API 部署指南
 
-3、cuda12.8
+## 环境要求
 
-请先更新你的 NVIDIA 显卡驱动，然后前往 NVIDIA 官网下载并安装 CUDA Toolkit 12.8。
+| 项目 | 最低配置 | 推荐配置 |
+|------|----------|----------|
+| GPU | NVIDIA 8GB 显存 | NVIDIA 12GB+ 显存 |
+| CPU | 4 核 | 8+ 核 |
+| 内存 | 16GB | 32GB+ |
+| 存储 | 20GB | 50GB+ SSD |
+| CUDA | 12.1+ | 12.1+ |
+| Python | 3.10 | 3.10 |
 
-💡 避坑提示： 本次教程强烈建议大家准备一张显存至少12GB 以上的 NVIDIA 显卡，以保证模型能顺利运行。
-二、获取源码与独立环境
-步骤 1：下载便携版 Python (Portable Python)
-去网上下载一个 Python 3.10.x 版本的便携版压缩包。解压到你的硬盘（例如 D:\Python_SoulX）。里面会有一个 python.exe，这就是我们等下要用的独立环境。
+## 快速部署
 
-步骤 2：下载 SoulX-Singer 源代码
-打开电脑的终端（CMD 或 PowerShell），找一个空间充裕的磁盘，输入以下命令把代码拉取下来：
+### 方式一：Docker 部署（推荐）
 
-git clone https://github.com/Soul-AILab/SoulX-Singer.git
-cd SoulX-Singer
-三、下载模型权重
+```bash
+# 1. 构建镜像
+docker build -f soulx_svc/Dockerfile -t soulx-svc:latest .
 
-你需要下载以下 2 个核心模型：
+# 2. 下载模型到本地（避免每次启动重新下载）
+mkdir -p pretrained_models
+huggingface-cli download Soul-AILab/SoulX-Singer --local-dir pretrained_models/SoulX-Singer
+huggingface-cli download Soul-AILab/SoulX-Singer-Preprocess --local-dir pretrained_models/SoulX-Singer-Preprocess
 
-主模型：SoulX-Singer
-https://www.modelscope.cn/models/Soul-AILab/SoulX-Singer
+# 3. 启动服务
+docker run -d \
+  --name soulx-svc \
+  --gpus all \
+  -p 8088:8088 \
+  -v $(pwd)/pretrained_models:/app/pretrained_models:ro \
+  -e SVC_FP16=1 \
+  -e SVC_CPU_THREADS=2 \
+  soulx-svc:latest
 
+# 4. 验证服务
+curl http://localhost:8088/health
+```
 
+### 方式二：原生部署
 
-预处理模型：SoulX-Singer-Preprocess
-https://www.modelscope.cn/models/Soul-AILab/SoulX-Singer-Preprocess
-📂 关键步骤：配置文件夹
-下载完成后，打开你刚刚克隆的 SoulX-Singer 源代码文件夹。
+```bash
+# 1. 创建环境
+conda create -n soulx-svc python=3.10 -y
+conda activate soulx-svc
 
-在根目录下，手动新建一个文件夹，命名为 model。
-将刚才下载的两个模型文件夹，完整地拖进这个 model 文件夹中。
-你的文件目录看起来应该是这样的：
+# 2. 安装 PyTorch (CUDA 12.1)
+pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 \
+  --index-url https://download.pytorch.org/whl/cu121
 
-SoulX-Singer/
- ├── model/  👈 (你新建的)
- │    ├── SoulX-Singer/              (主模型权重)
- │    └── SoulX-Singer-Preprocess/   (预处理模型权重)
- ├── requirements.txt
- └── ...(其他代码文件)
-四、安装依赖包
+# 3. 安装依赖
+pip install -r requirements.txt
+pip install -r soulx_svc/requirements-api.txt
 
-打开终端，一定要使用你刚才下载的便携版 Python 的绝对路径 来执行安装命令
+# 4. 下载模型
+pip install -U huggingface_hub
+huggingface-cli download Soul-AILab/SoulX-Singer --local-dir pretrained_models/SoulX-Singer
+huggingface-cli download Soul-AILab/SoulX-Singer-Preprocess --local-dir pretrained_models/SoulX-Singer-Preprocess
 
-(假设你的便携版路径是 D:\Python_SoulX\python.exe)
+# 5. 启动服务
+export PYTHONPATH=$PWD:$PYTHONPATH
+python -m soulx_svc.api --host 0.0.0.0 --port 8088
+```
 
-D:\Python_SoulX\python.exe -m pip install torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 
---index-url https://download.pytorch.org/whl/cu128
-D:\Python_SoulX\python.exe -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-五、核心逻辑源代码
+## 环境变量配置
 
-🎧 SoulxSingerProcessor（音频预处理器）
-当你上传一段参考音频时，它负责对音频进行切片、降噪，并提取音高（Pitch）、特征向量等信息，最终转化为大模型能看懂的 metadata（元数据）。
-🎤 SoulxSingerWrapper（核心演唱引擎）
-它接收 Processor 传来的 metadata，并调用我们放在 model 文件夹里的主模型进行深度推理。它能完美克隆参考音频的音色，并结合你的指令生成全新的歌曲音频。
-🖥️ WebUI（可视化交互界面）
-将复杂的 Processor 和 Wrapper 逻辑隐藏在后台，利用 Gradio 框架在网页上画出上传框、按钮和播放器。
-五、启动WebUI
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `SVC_FP16` | `0` | 启用 FP16 推理（GPU 推荐开启） |
+| `SVC_CPU_THREADS` | - | CPU 线程数限制 |
+| `SVC_LIMIT_CPU` | `0` | 限制为单线程（最省 CPU，最慢） |
+| `SVC_CORS_ORIGINS` | - | CORS 允许的源，逗号分隔，`*` 允许所有 |
+| `SVC_KEEP_SESSIONS` | `0` | 保留会话目录（调试用） |
+| `CUDA_VISIBLE_DEVICES` | `0` | 指定 GPU 设备 |
 
-在终端中，使用你的便携版 Python 运行项目的 WebUI 启动脚本（例如 webui.py，具体以项目提供的入口文件名为准）：
+### 常用配置示例
 
-D:\Python_SoulX\python.exe webui.py
-当你在控制台看到如下提示时，说明大模型已经成功在你本地苏醒：
+```bash
+# GPU 部署（推荐）
+export SVC_FP16=1
+export SVC_CPU_THREADS=2
+export CUDA_VISIBLE_DEVICES=0
 
-Running on local URL:  http://127.0.0.1:7860/
-操作指南：
+# CPU 部署（开发测试）
+export SVC_CPU_THREADS=4
+export DEVICE=cpu
 
-打开你电脑上的任意浏览器（推荐 Chrome 或 Edge）。
-在地址栏输入：http://127.0.0.1:7860/ 并回车。
-熟悉的图形化界面出现了！上传你的参考人声，输入曲谱/歌词，点击**“生成”**。
-稍等片刻（生成速度取决于你的显卡性能），一首由你的专属 AI 歌手演唱的歌曲就诞生啦！
-💡 常见问题 Q&A
-Q：运行到一半提示 CUDA out of memory 怎么办？
-A：这是爆显存了（OOM）。建议在界面中缩短单次生成的音频长度，或者在代码中调低 Batch Size。
-Q：为什么第一次生成特别慢？
+# 开放 CORS（前端调用）
+export SVC_CORS_ORIGINS="https://your-frontend.com"
+# 或允许所有
+export SVC_CORS_ORIGINS="*"
+```
 
-A：第一次生成时，系统需要将几个 G 的模型权重加载到显卡的显存中，后续连续生成就会快很多。
+## API 使用
 
+### 健康检查
 
+```bash
+curl http://localhost:8088/health
+# {"status": "ok", "service": "svc"}
+```
 
+### SVC 转换
+
+```bash
+curl -X POST http://localhost:8088/v1/svc \
+  -F "prompt_audio=@prompt.wav" \
+  -F "target_audio=@target.wav" \
+  -o generated.wav
+```
+
+### 完整参数
+
+```bash
+curl -X POST http://localhost:8088/v1/svc \
+  -F "prompt_audio=@prompt.wav" \
+  -F "target_audio=@target.wav" \
+  -F "prompt_vocal_sep=false" \
+  -F "target_vocal_sep=true" \
+  -F "auto_shift=true" \
+  -F "auto_mix_acc=true" \
+  -F "pitch_shift=0" \
+  -F "n_steps=32" \
+  -F "cfg=1.0" \
+  -F "seed=42" \
+  -o generated.wav
+```
+
+### 参数说明
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `prompt_audio` | file | 必填 | 参考音色音频（歌手音色） |
+| `target_audio` | file | 必填 | 目标演唱音频（要转换的内容） |
+| `prompt_vocal_sep` | bool | `false` | 对参考音频做人声分离 |
+| `target_vocal_sep` | bool | `true` | 对目标音频做人声分离 |
+| `auto_shift` | bool | `true` | 自动音高偏移对齐 |
+| `auto_mix_acc` | bool | `true` | 自动混合伴奏 |
+| `pitch_shift` | int | `0` | 音高偏移（半音） |
+| `n_steps` | int | `32` | Flow matching 步数 |
+| `cfg` | float | `1.0` | Classifier-free guidance scale |
+| `seed` | int | `42` | 随机种子 |
+
+## 生产部署建议
+
+### 1. 使用 Gunicorn + Uvicorn
+
+```bash
+pip install gunicorn
+
+gunicorn soulx_svc.api:app \
+  --workers 1 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8088 \
+  --timeout 300 \
+  --keep-alive 5
+```
+
+> **注意**：由于 GPU 显存限制，`--workers` 建议设为 1。如需并发，考虑多实例 + 负载均衡。
+
+### 2. Nginx 反向代理
+
+```nginx
+upstream soulx_svc {
+    server 127.0.0.1:8088;
+}
+
+server {
+    listen 80;
+    server_name api.example.com;
+
+    client_max_body_size 100M;
+    proxy_read_timeout 300s;
+
+    location / {
+        proxy_pass http://soulx_svc;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### 3. Systemd 服务
+
+```ini
+# /etc/systemd/system/soulx-svc.service
+[Unit]
+Description=SoulX-Singer SVC API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/SoulX-Singer
+Environment="PYTHONPATH=/opt/SoulX-Singer"
+Environment="SVC_FP16=1"
+Environment="CUDA_VISIBLE_DEVICES=0"
+ExecStart=/opt/conda/envs/soulx-svc/bin/python -m soulx_svc.api --host 127.0.0.1 --port 8088
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable soulx-svc
+sudo systemctl start soulx-svc
+```
+
+### 4. Kubernetes 部署
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soulx-svc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: soulx-svc
+  template:
+    metadata:
+      labels:
+        app: soulx-svc
+    spec:
+      containers:
+      - name: soulx-svc
+        image: soulx-svc:latest
+        ports:
+        - containerPort: 8088
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "16Gi"
+          requests:
+            memory: "8Gi"
+        env:
+        - name: SVC_FP16
+          value: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 120
+          periodSeconds: 10
+        volumeMounts:
+        - name: models
+          mountPath: /app/pretrained_models
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: soulx-models-pvc
+```
+
+## 性能调优
+
+### GPU 优化
+
+```bash
+# 启用 FP16（显存减半，速度提升）
+export SVC_FP16=1
+
+# 限制 GPU 显存占用
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+```
+
+### CPU 优化（无 GPU 环境）
+
+```bash
+# 限制 CPU 线程（避免占满）
+export SVC_CPU_THREADS=4
+
+# 或极限省 CPU（最慢）
+export SVC_LIMIT_CPU=1
+```
+
+## 故障排查
+
+### 常见错误
+
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| `CUDA out of memory` | 显存不足 | 启用 `SVC_FP16=1`，或减少 `n_steps` |
+| `pretrained_models not found` | 模型未下载 | 执行 `huggingface-cli download` |
+| `preprocess failed` | 音频格式不支持 | 转换为标准 WAV/MP3 |
+| `503 SVC 推理依赖未安装` | 依赖缺失 | 安装 `requirements.txt` |
+
+### 日志调试
+
+```bash
+# 保留会话目录（查看中间结果）
+export SVC_KEEP_SESSIONS=1
+
+# 查看会话输出
+ls outputs/soulx_svc/sessions/
+```
