@@ -129,18 +129,46 @@ curl -X POST http://localhost:8088/v1/svc \
 
 ### 参数说明
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `prompt_audio` | file | 必填 | 参考音色音频（歌手音色） |
-| `target_audio` | file | 必填 | 目标演唱音频（要转换的内容） |
-| `prompt_vocal_sep` | bool | `false` | 对参考音频做人声分离 |
-| `target_vocal_sep` | bool | `true` | 对目标音频做人声分离 |
-| `auto_shift` | bool | `true` | 自动音高偏移对齐 |
-| `auto_mix_acc` | bool | `true` | 自动混合伴奏 |
-| `pitch_shift` | int | `0` | 音高偏移（半音） |
-| `n_steps` | int | `32` | Flow matching 步数 |
-| `cfg` | float | `1.0` | Classifier-free guidance scale |
-| `seed` | int | `42` | 随机种子 |
+| 参数 | 类型 | 必填 | 默认值 | 推荐值 | 说明 |
+|------|------|------|--------|--------|------|
+| `prompt_audio` | file | ❌ | - | - | 参考音色音频（歌手音色，文件上传） |
+| `prompt_audio_url` | string | ❌ | - | - | 参考音色音频 URL（文件下载） |
+| `target_audio` | file | ❌ | - | - | 目标演唱音频（要转换的内容，文件上传） |
+| `target_audio_url` | string | ❌ | - | - | 目标演唱音频 URL（文件下载） |
+| `prompt_vocal_sep` | bool | ❌ | `false` | `false` | 对参考音频做人声分离（通常不需要，参考音频应已是纯净人声） |
+| `target_vocal_sep` | bool | ❌ | `true` | `true` | 对目标音频做人声分离（如果目标是带伴奏的歌曲，推荐 true） |
+| `auto_shift` | bool | ❌ | `true` | `true` | 自动音高偏移对齐（让转换后的歌声更贴合参考音色） |
+| `auto_mix_acc` | bool | ❌ | `true` | `true` | 自动混合伴奏（仅在 target_vocal_sep=true 时有效） |
+| `pitch_shift` | int | ❌ | `0` | `0` | 音高偏移（半音，正数升高，负数降低，auto_shift=true 时建议 0） |
+| `n_steps` | int | ❌ | `32` | `16-32` | Flow matching 步数（16 速度快，32 质量好，推荐 16 用于生产） |
+| `cfg` | float | ❌ | `1.0` | `1.0-2.0` | Classifier-free guidance scale（值越高音色相似度越高，但可能失真） |
+| `seed` | int | ❌ | `42` | `42` | 随机种子（固定值保证结果可复现） |
+
+### 推荐配置组合
+
+#### 快速转换（生产环境）
+```bash
+n_steps=16
+cfg=1.0
+auto_shift=true
+auto_mix_acc=true
+```
+
+#### 高质量转换
+```bash
+n_steps=32
+cfg=1.5
+auto_shift=true
+auto_mix_acc=true
+```
+
+#### 干声转换（无伴奏）
+```bash
+target_vocal_sep=false
+auto_mix_acc=false
+auto_shift=true
+n_steps=32
+```
 
 ## 生产部署建议
 

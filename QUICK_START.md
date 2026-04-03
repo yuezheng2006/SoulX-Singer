@@ -70,16 +70,60 @@ bash test_api.sh
 
 ---
 
+## 常见配置参数
+
+### API 参数说明
+
+| 参数 | 类型 | 默认值 | 推荐值 | 说明 |
+|------|------|--------|--------|------|
+| `prompt_vocal_sep` | bool | false | false | 是否对参考音频做人声分离（通常不需要，参考音频应已是纯净人声） |
+| `target_vocal_sep` | bool | true | true | 是否对目标音频做人声分离（如果目标是带伴奏的歌曲，推荐 true） |
+| `auto_shift` | bool | true | true | 是否自动调整音高（让转换后的歌声更贴合参考音色） |
+| `auto_mix_acc` | bool | true | true | 是否自动混音伴奏（仅在 target_vocal_sep=true 时有效） |
+| `pitch_shift` | int | 0 | 0 | 手动音高偏移（半音，正数升高，负数降低，auto_shift=true 时建议 0） |
+| `n_steps` | int | 32 | 16-32 | 采样步数（16 速度快，32 质量好，推荐 16 用于生产） |
+| `cfg` | float | 1.0 | 1.0-2.0 | 分类器自由引导强度（值越高音色相似度越高，但可能失真） |
+| `seed` | int | 42 | 42 | 随机种子（固定值保证结果可复现） |
+| `prompt_max_sec` | int | 30 | 30 | 参考音频最大时长（秒） |
+| `target_max_sec` | int | 600 | 300 | 目标音频最大时长（秒，建议 < 5 分钟） |
+
+### 推荐配置组合
+
+#### 快速转换（生产环境）
+```bash
+n_steps=16
+cfg=1.0
+auto_shift=true
+auto_mix_acc=true
+```
+
+#### 高质量转换
+```bash
+n_steps=32
+cfg=1.5
+auto_shift=true
+auto_mix_acc=true
+```
+
+#### 干声转换（无伴奏）
+```bash
+target_vocal_sep=false
+auto_mix_acc=false
+auto_shift=true
+n_steps=32
+```
+
 ## API 使用示例
 
 ### cURL 示例
 
 ```bash
+# 使用推荐配置
 curl -X POST "http://your-server-ip:8088/v1/svc" \
   -F "prompt_audio=@prompt.wav" \
   -F "target_audio=@target.wav" \
   -F "auto_shift=true" \
-  -F "n_steps=32" \
+  -F "n_steps=16" \
   -F "cfg=1.0" \
   -o output.wav
 ```
@@ -91,15 +135,16 @@ import requests
 
 url = "http://your-server-ip:8088/v1/svc"
 
-files = {
-    'prompt_audio': open('prompt.wav', 'rb'),
-    'target_audio': open('target.wav', 'rb'),
+# 使用 URL 方式
+data = {
+    'prompt_audio_url': 'https://example.com/prompt.wav',
+    'target_audio_url': 'https://example.com/target.mp3',
     'auto_shift': True,
-    'n_steps': 32,
+    'n_steps': 16,
     'cfg': 1.0,
 }
 
-response = requests.post(url, files=files)
+response = requests.post(url, data=data)
 with open('output.wav', 'wb') as f:
     f.write(response.content)
 ```
